@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import { User } from '../models/User.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -40,6 +40,7 @@ function publicUser(user) {
     username: user.username,
     bestScore: user.bestScore,
     gamesPlayed: user.gamesPlayed,
+    isAdmin: isAdmin(user),
   };
 }
 
