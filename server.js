@@ -9,6 +9,7 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
 import scoreRoutes from './routes/scores.js';
 import contentRoutes from './routes/content.js';
+import settingsRoutes from './routes/settings.js';
 import { Content } from './models/Content.js';
 
 // --- Kiểm tra biến môi trường bắt buộc, fail sớm với thông báo rõ ràng ---
@@ -89,10 +90,24 @@ app.use('/api', apiLimiter);
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Favicon động: chuyển hướng tới favicon hiện tại (Cloudinary) do admin đặt.
+// Frontend hardcode <link rel="icon" href="/favicon.ico"> và Vercel rewrite về đây.
+app.get('/favicon.ico', async (req, res) => {
+  try {
+    const doc = await Content.findOne({ key: 'site' }).lean();
+    const url = doc?.data?.faviconUrl;
+    if (url) return res.redirect(302, url);
+  } catch {
+    /* bỏ qua */
+  }
+  return res.status(204).end(); // chưa đặt favicon
+});
+
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', scoreRoutes); // => /api/scores, /api/leaderboard, /api/scores/session
 app.use('/api', contentRoutes); // => /api/content/:key
+app.use('/api', settingsRoutes); // => /api/settings, /api/settings/upload
 
 // Tạo nội dung mặc định cho trang Giới thiệu / Phần thưởng nếu chưa có.
 async function seedContent() {
