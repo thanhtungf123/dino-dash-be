@@ -16,6 +16,13 @@ const BASE_BUFFER = 300;
 // Thời hạn của session token (1 ván không nên dài hơn mức này).
 const SESSION_TTL_SECONDS = 30 * 60;
 
+// --- Cache bảng xếp hạng (phần công khai) để giảm tải DB khi đông người ---
+const LB_CACHE_TTL = 15000; // 15 giây
+const lbCache = new Map(); // limit -> { list, at }
+function clearLbCache() {
+  lbCache.clear();
+}
+
 /**
  * POST /api/scores/session
  * Cấp "session token" khi bắt đầu một ván. Server dùng thời điểm cấp (iat)
@@ -80,6 +87,9 @@ router.post('/scores', requireAuth, async (req, res) => {
     }
     await user.save();
 
+    // Có kỷ lục mới -> xóa cache để bảng xếp hạng cập nhật ngay.
+    if (improved) clearLbCache();
+
     return res.json({
       improved,
       bestScore: user.bestScore,
@@ -111,11 +121,19 @@ router.get('/leaderboard', async (req, res) => {
     // Cho phép ?limit (mặc định 10, tối đa 100) để trang bảng xếp hạng hiện nhiều hơn.
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
 
-    const top = await User.find({ bestScore: { $gt: 0 } })
-      .sort({ bestScore: -1, updatedAt: 1 })
-      .limit(limit)
-      .select('username bestScore -_id')
-      .lean();
+    // Dùng cache nếu còn hạn, ngược lại truy vấn DB rồi lưu cache.
+    let top;
+    const cached = lbCache.get(limit);
+    if (cached && Date.now() - cached.at < LB_CACHE_TTL) {
+      top = cached.list;
+    } else {
+      top = await User.find({ bestScore: { $gt: 0 } })
+        .sort({ bestScore: -1, updatedAt: 1 })
+        .limit(limit)
+        .select('username bestScore -_id')
+        .lean();
+      lbCache.set(limit, { list: top, at: Date.now() });
+    }
 
     let me = null;
     const userId = optionalUserId(req);
