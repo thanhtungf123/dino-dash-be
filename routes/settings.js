@@ -5,10 +5,12 @@ import { v2 as cloudinary } from 'cloudinary';
 import { Content } from '../models/Content.js';
 import { requireAdmin } from '../middleware/auth.js';
 
+// .trim() để phòng trường hợp biến môi trường bị dính khoảng trắng thừa
+// (dấu cách thừa trong api_secret sẽ làm sai chữ ký -> lỗi "Invalid Signature").
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: (process.env.CLOUDINARY_CLOUD_NAME || '').trim(),
+  api_key: (process.env.CLOUDINARY_API_KEY || '').trim(),
+  api_secret: (process.env.CLOUDINARY_API_SECRET || '').trim(),
 });
 
 const upload = multer({
