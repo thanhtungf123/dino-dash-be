@@ -10,7 +10,9 @@ import authRoutes from './routes/auth.js';
 import scoreRoutes from './routes/scores.js';
 import contentRoutes from './routes/content.js';
 import settingsRoutes from './routes/settings.js';
+import pageRoutes, { renderCustomPage } from './routes/pages.js';
 import { Content } from './models/Content.js';
+import { Page } from './models/Page.js';
 
 // --- Kiểm tra biến môi trường bắt buộc, fail sớm với thông báo rõ ràng ---
 const REQUIRED_ENV = ['MONGODB_URI', 'JWT_SECRET'];
@@ -108,6 +110,24 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', scoreRoutes); // => /api/scores, /api/leaderboard, /api/scores/session
 app.use('/api', contentRoutes); // => /api/content/:key
 app.use('/api', settingsRoutes); // => /api/settings, /api/settings/upload
+app.use('/api', pageRoutes); // => /api/pages (CRUD trang tùy biến)
+
+// SSR trang tùy biến do admin tạo: /<slug> (đặt CUỐI, sau mọi route khác).
+// Nginx proxy các path không phải file tĩnh/không phải /api về đây.
+app.get('*', async (req, res) => {
+  const slug = req.path.replace(/^\/+|\/+$/g, '').toLowerCase();
+  if (!slug) return res.status(404).send('Not found');
+  try {
+    const page = await Page.findOne({ slug });
+    if (page) {
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      return res.send(renderCustomPage(page));
+    }
+  } catch (err) {
+    console.error('render page error:', err);
+  }
+  return res.status(404).send('Not found');
+});
 
 // Tạo nội dung mặc định cho trang Giới thiệu / Phần thưởng nếu chưa có.
 async function seedContent() {
@@ -134,6 +154,12 @@ async function seedContent() {
         'Ba tài khoản dẫn đầu bảng xếp hạng nhận thưởng theo mức ở trên.\n' +
         'Ban tổ chức có quyền hủy giải với tài khoản gian lận điểm hoặc dùng công cụ tự động.',
       contact: '[điền kênh liên hệ / trang Facebook / email của bạn]',
+    },
+    home: {
+      title: 'Về Dino Dash',
+      body:
+        'Dino Dash là game khủng long chạy vượt chướng ngại vật, miễn phí ngay trên trình duyệt — không cần cài đặt.\n\n' +
+        'Đăng nhập để lưu điểm, leo lên bảng xếp hạng và nhận quà hàng tháng. Chúc bạn chơi vui!',
     },
   };
 

@@ -5,7 +5,7 @@ import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const ALLOWED_KEYS = ['about', 'rewards'];
+const ALLOWED_KEYS = ['about', 'rewards', 'home'];
 
 // GET /api/content/:key — đọc nội dung (công khai, cho trang người chơi).
 router.get('/content/:key', async (req, res) => {
