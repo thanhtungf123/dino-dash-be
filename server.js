@@ -40,8 +40,11 @@ const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === 'true';
 // để cookie "secure" và rate-limit theo IP hoạt động đúng.
 app.set('trust proxy', 1);
 
-// Security headers. Tắt CORP để không chặn API bị gọi cross-origin (CORS lo phần này).
-app.use(helmet({ crossOriginResourcePolicy: false }));
+// Security headers. Tắt CORP (CORS lo phần này) và tắt CSP (tránh chặn ảnh
+// Cloudinary / CDN trên trang SSR; XSS đã được lọc bằng sanitize-html).
+app.use(
+  helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false })
+);
 
 // CORS: chỉ cho phép origin trong danh sách (và preview Vercel nếu bật), kèm cookie.
 app.use(

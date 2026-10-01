@@ -2,6 +2,7 @@ import express from 'express';
 
 import { Content } from '../models/Content.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { cleanHtml } from '../lib/sanitize.js';
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ router.put('/content/:key', requireAdmin, async (req, res) => {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
   }
+  // Lọc HTML cho trường nội dung giàu định dạng (từ editor).
+  if (typeof data.body === 'string') data.body = cleanHtml(data.body);
+
   const doc = await Content.findOneAndUpdate(
     { key },
     { data },

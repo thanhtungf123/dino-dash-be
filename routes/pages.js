@@ -2,6 +2,7 @@ import express from 'express';
 
 import { Page } from '../models/Page.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { cleanHtml } from '../lib/sanitize.js';
 
 const router = express.Router();
 
@@ -58,7 +59,7 @@ export function renderCustomPage(page) {
     </nav>
     <main class="page">
       <h1 class="page-title">${esc(page.title)}</h1>
-      <div class="page-root">${paragraphsHtml(page.body)}</div>
+      <div class="page-root page-rte">${page.body || ''}</div>
       <p class="page-back"><a href="/">← Về trang chơi</a></p>
     </main>
     <footer class="site-footer">
@@ -103,7 +104,7 @@ router.post('/pages', requireAdmin, async (req, res) => {
       slug,
       title,
       metaDescription: String(req.body.metaDescription || ''),
-      body: String(req.body.body || ''),
+      body: cleanHtml(req.body.body),
       noindex: !!req.body.noindex,
     });
     res.status(201).json({ page: publicPage(page) });
@@ -118,7 +119,7 @@ router.put('/pages/:id', requireAdmin, async (req, res) => {
     const update = {
       title: String(req.body.title || '').trim(),
       metaDescription: String(req.body.metaDescription || ''),
-      body: String(req.body.body || ''),
+      body: cleanHtml(req.body.body),
       noindex: !!req.body.noindex,
     };
     const page = await Page.findByIdAndUpdate(req.params.id, update, {
