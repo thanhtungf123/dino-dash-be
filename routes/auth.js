@@ -11,6 +11,12 @@ const TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+/** Thông báo hiển thị cho tài khoản bị cấm (kèm lý do nếu có). */
+function banMessage(user) {
+  const base = 'Tài khoản của bạn đã bị cấm khỏi hệ thống do gian lận điểm.';
+  return user.banReason ? `${base} Lý do: ${user.banReason}` : base;
+}
+
 /**
  * Cấu hình cookie chứa JWT. httpOnly => JavaScript client không đọc được (chống XSS).
  * - Local (http, cùng máy): sameSite 'lax', secure false.
@@ -97,6 +103,11 @@ router.post('/login', async (req, res) => {
         .json({ error: 'Sai tên đăng nhập hoặc mật khẩu.' });
     }
 
+    // Tài khoản bị cấm (gian lận): báo rõ lý do, không cấp phiên.
+    if (user.banned) {
+      return res.status(403).json({ error: banMessage(user), banned: true });
+    }
+
     res.cookie('token', signToken(user), cookieOptions());
     return res.json({ user: publicUser(user) });
   } catch (err) {
@@ -116,6 +127,11 @@ router.get('/me', requireAuth, async (req, res) => {
   const user = await User.findById(req.userId);
   if (!user) {
     return res.status(404).json({ error: 'Không tìm thấy người dùng.' });
+  }
+  // Bị cấm giữa chừng dù còn cookie: chặn và báo lý do.
+  if (user.banned) {
+    res.clearCookie('token', cookieOptions());
+    return res.status(403).json({ error: banMessage(user), banned: true });
   }
   return res.json({ user: publicUser(user) });
 });

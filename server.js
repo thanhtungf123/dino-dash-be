@@ -8,11 +8,13 @@ import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/auth.js';
 import scoreRoutes from './routes/scores.js';
+import seasonRoutes from './routes/seasons.js';
 import contentRoutes from './routes/content.js';
 import settingsRoutes from './routes/settings.js';
 import pageRoutes, { renderCustomPage } from './routes/pages.js';
 import { Content } from './models/Content.js';
 import { Page } from './models/Page.js';
+import { ensureSeasonsClosed } from './lib/seasons.js';
 
 // --- Kiểm tra biến môi trường bắt buộc, fail sớm với thông báo rõ ràng ---
 const REQUIRED_ENV = ['MONGODB_URI', 'JWT_SECRET'];
@@ -111,6 +113,7 @@ app.get('/favicon.ico', async (req, res) => {
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', scoreRoutes); // => /api/scores, /api/leaderboard, /api/scores/session
+app.use('/api', seasonRoutes); // => /api/me/history, /api/me/claim, /api/admin/seasons...
 app.use('/api', contentRoutes); // => /api/content/:key
 app.use('/api', settingsRoutes); // => /api/settings, /api/settings/upload
 app.use('/api', pageRoutes); // => /api/pages (CRUD trang tùy biến)
@@ -180,6 +183,14 @@ async function start() {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✓ Đã kết nối MongoDB');
     await seedContent();
+
+    // Tự chốt các tháng đã qua mà chưa có mùa giải (phần "tự động" của hybrid).
+    try {
+      const closed = await ensureSeasonsClosed();
+      if (closed.length) console.log(`  + Đã tự chốt mùa: ${closed.join(', ')}`);
+    } catch (err) {
+      console.error('ensureSeasonsClosed (startup) error:', err);
+    }
 
     app.listen(PORT, () => {
       console.log(`✓ API chạy tại http://localhost:${PORT}`);

@@ -2,7 +2,11 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 
 import { User } from '../models/User.js';
+import { MonthlyScore } from '../models/MonthlyScore.js';
+import { Season } from '../models/Season.js';
 import { requireAuth } from '../middleware/auth.js';
+import { currentMonthKey, monthKeyLabel } from '../lib/month.js';
+import { ensureSeasonsClosed } from '../lib/seasons.js';
 
 const router = express.Router();
 
@@ -18,9 +22,22 @@ const SESSION_TTL_SECONDS = 30 * 60;
 
 // --- Cache bảng xếp hạng (phần công khai) để giảm tải DB khi đông người ---
 const LB_CACHE_TTL = 15000; // 15 giây
-const lbCache = new Map(); // limit -> { list, at }
+// Key cache = `${monthKey}:${limit}` để không lẫn dữ liệu giữa các tháng.
+const lbCache = new Map();
 function clearLbCache() {
   lbCache.clear();
+}
+
+// --- Tự chốt tháng "lười": chạy tối đa 1 lần mỗi vài phút ---
+let lastEnsure = 0;
+async function maybeEnsureSeasons() {
+  if (Date.now() - lastEnsure < 5 * 60 * 1000) return;
+  lastEnsure = Date.now();
+  try {
+    await ensureSeasonsClosed();
+  } catch (err) {
+    console.error('ensureSeasonsClosed error:', err);
+  }
 }
 
 /**
@@ -54,7 +71,6 @@ function maxScoreFromSession(sessionToken, userId) {
 }
 
 // POST /api/scores — nộp điểm sau khi game over (cần đăng nhập).
-// Chỉ ghi DB khi điểm mới CAO HƠN kỷ lục cũ => giảm tải ghi.
 router.post('/scores', requireAuth, async (req, res) => {
   try {
     const score = Math.floor(Number(req.body.score));
@@ -78,22 +94,48 @@ router.post('/scores', requireAuth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'Không tìm thấy người dùng.' });
     }
+    // Tài khoản bị cấm (gian lận) -> không được lưu điểm.
+    if (user.banned) {
+      return res
+        .status(403)
+        .json({ error: 'Tài khoản của bạn đã bị cấm.', banned: true });
+    }
 
+    // Thống kê cả đời trên document User.
     user.gamesPlayed += 1;
-    let improved = false;
+    let allTimeImproved = false;
     if (score > user.bestScore) {
       user.bestScore = score;
-      improved = true;
+      allTimeImproved = true;
     }
     await user.save();
 
-    // Có kỷ lục mới -> xóa cache để bảng xếp hạng cập nhật ngay.
-    if (improved) clearLbCache();
+    // Điểm theo THÁNG (dùng cho bảng xếp hạng & giải thưởng).
+    const monthKey = currentMonthKey();
+    const before = await MonthlyScore.findOneAndUpdate(
+      { user: user._id, monthKey },
+      {
+        $setOnInsert: { user: user._id, monthKey },
+        $set: { username: user.username },
+        $inc: { gamesPlayed: 1 },
+        $max: { bestScore: score },
+      },
+      { upsert: true, new: false }
+    );
+    const prevMonthlyBest = before?.bestScore ?? 0;
+    const monthlyImproved = score > prevMonthlyBest;
+    const monthlyBest = Math.max(prevMonthlyBest, score);
+
+    // Có kỷ lục tháng mới -> xóa cache để bảng xếp hạng cập nhật ngay.
+    if (monthlyImproved) clearLbCache();
 
     return res.json({
-      improved,
-      bestScore: user.bestScore,
+      improved: monthlyImproved,
+      allTimeImproved,
+      monthlyBest,
+      bestScore: user.bestScore, // kỷ lục mọi thời đại
       gamesPlayed: user.gamesPlayed,
+      monthKey,
     });
   } catch (err) {
     console.error('submit score error:', err);
@@ -115,45 +157,80 @@ function optionalUserId(req) {
   }
 }
 
-// GET /api/leaderboard — Top 10 (công khai). Nếu đã đăng nhập, kèm hạng của bạn.
+// GET /api/leaderboard — Top của THÁNG HIỆN TẠI (công khai).
+// Nếu đã đăng nhập, kèm hạng của bạn trong tháng.
 router.get('/leaderboard', async (req, res) => {
   try {
-    // Cho phép ?limit (mặc định 10, tối đa 100) để trang bảng xếp hạng hiện nhiều hơn.
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    maybeEnsureSeasons(); // tự chốt tháng đã qua (không chặn response)
 
-    // Dùng cache nếu còn hạn, ngược lại truy vấn DB rồi lưu cache.
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const monthKey = currentMonthKey();
+    const cacheKey = `${monthKey}:${limit}`;
+
     let top;
-    const cached = lbCache.get(limit);
+    const cached = lbCache.get(cacheKey);
     if (cached && Date.now() - cached.at < LB_CACHE_TTL) {
       top = cached.list;
     } else {
-      top = await User.find({ bestScore: { $gt: 0 } })
+      top = await MonthlyScore.find({ monthKey, bestScore: { $gt: 0 } })
         .sort({ bestScore: -1, updatedAt: 1 })
         .limit(limit)
         .select('username bestScore -_id')
         .lean();
-      lbCache.set(limit, { list: top, at: Date.now() });
+      lbCache.set(cacheKey, { list: top, at: Date.now() });
     }
 
     let me = null;
     const userId = optionalUserId(req);
     if (userId) {
-      const user = await User.findById(userId).select('username bestScore').lean();
-      if (user) {
-        // Hạng = số người điểm cao hơn + 1 (chỉ tính khi đã có điểm).
+      const mine = await MonthlyScore.findOne({ user: userId, monthKey })
+        .select('username bestScore')
+        .lean();
+      if (mine) {
         const rank =
-          user.bestScore > 0
-            ? (await User.countDocuments({
-                bestScore: { $gt: user.bestScore },
+          mine.bestScore > 0
+            ? (await MonthlyScore.countDocuments({
+                monthKey,
+                bestScore: { $gt: mine.bestScore },
               })) + 1
             : null;
-        me = { username: user.username, bestScore: user.bestScore, rank };
+        me = { username: mine.username, bestScore: mine.bestScore, rank };
       }
     }
 
-    return res.json({ leaderboard: top, me });
+    return res.json({
+      leaderboard: top,
+      me,
+      monthKey,
+      monthLabel: monthKeyLabel(monthKey),
+    });
   } catch (err) {
     console.error('leaderboard error:', err);
+    return res.status(500).json({ error: 'Lỗi máy chủ.' });
+  }
+});
+
+// GET /api/leaderboard/previous — Top 3 của THÁNG TRƯỚC đã chốt (công khai).
+// Dùng cho khối "Top 3 tháng trước" ở trang chủ. Không trả thông tin cá nhân.
+router.get('/leaderboard/previous', async (req, res) => {
+  try {
+    maybeEnsureSeasons();
+    const season = await Season.findOne().sort({ monthKey: -1 }).lean();
+    if (!season) return res.json({ season: null });
+
+    return res.json({
+      season: {
+        monthKey: season.monthKey,
+        label: monthKeyLabel(season.monthKey),
+        winners: (season.winners || []).map(w => ({
+          rank: w.rank,
+          username: w.username,
+          score: w.score,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('previous season error:', err);
     return res.status(500).json({ error: 'Lỗi máy chủ.' });
   }
 });
