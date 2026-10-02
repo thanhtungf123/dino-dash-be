@@ -6,7 +6,7 @@ import { cleanHtml } from '../lib/sanitize.js';
 
 const router = express.Router();
 
-const ALLOWED_KEYS = ['about', 'rewards', 'home'];
+const ALLOWED_KEYS = ['about', 'rewards', 'home', 'seo'];
 
 // GET /api/content/:key — đọc nội dung (công khai, cho trang người chơi).
 router.get('/content/:key', async (req, res) => {
