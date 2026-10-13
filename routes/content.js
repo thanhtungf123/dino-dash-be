@@ -6,7 +6,7 @@ import { cleanHtml } from '../lib/sanitize.js';
 
 const router = express.Router();
 
-const ALLOWED_KEYS = ['about', 'rewards', 'home', 'seo'];
+const ALLOWED_KEYS = ['about', 'rewards', 'home', 'seo', 'games'];
 
 // GET /api/content/:key — đọc nội dung (công khai, cho trang người chơi).
 router.get('/content/:key', async (req, res) => {
@@ -28,8 +28,11 @@ router.put('/content/:key', requireAdmin, async (req, res) => {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
   }
-  // Lọc HTML cho trường nội dung giàu định dạng (từ editor).
+  // Lọc HTML cho các trường nội dung giàu định dạng (từ editor).
   if (typeof data.body === 'string') data.body = cleanHtml(data.body);
+  if (typeof data.intro === 'string' && key === 'games') {
+    data.intro = cleanHtml(data.intro);
+  }
 
   const doc = await Content.findOneAndUpdate(
     { key },

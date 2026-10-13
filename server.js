@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -12,6 +15,12 @@ import seasonRoutes from './routes/seasons.js';
 import contentRoutes from './routes/content.js';
 import settingsRoutes from './routes/settings.js';
 import pageRoutes, { renderCustomPage } from './routes/pages.js';
+import gameRoutes, {
+  gamesIndexHandler,
+  gameDetailHandler,
+  LISTING_PATH,
+  GAME_PATH_PREFIX,
+} from './routes/games.js';
 import { Content } from './models/Content.js';
 import { Page } from './models/Page.js';
 import { ensureSeasonsClosed } from './lib/seasons.js';
@@ -117,6 +126,21 @@ app.use('/api', seasonRoutes); // => /api/me/history, /api/me/claim, /api/admin/
 app.use('/api', contentRoutes); // => /api/content/:key
 app.use('/api', settingsRoutes); // => /api/settings, /api/settings/upload
 app.use('/api', pageRoutes); // => /api/pages (CRUD trang tùy biến)
+app.use('/api', gameRoutes); // => /api/admin/games (CRUD trò chơi)
+
+// Phục vụ file tĩnh (frontend) nếu thư mục tồn tại cạnh backend.
+// Giúp chạy local một origin (http://localhost:3001 chạy đầy đủ cả SSR lẫn tĩnh),
+// giống production. Trên host chỉ deploy backend thì thư mục này không có -> bỏ qua,
+// nginx/Vercel lo phần tĩnh như cũ.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FRONTEND_DIR = process.env.FRONTEND_DIR || path.join(__dirname, '../frontend');
+if (fs.existsSync(FRONTEND_DIR)) {
+  app.use(express.static(FRONTEND_DIR, { extensions: ['html'] }));
+}
+
+// SSR trang trò chơi (đặt TRƯỚC catch-all). Khớp cả khi có "/" ở cuối.
+app.get(LISTING_PATH, gamesIndexHandler); // /all-games
+app.get(`${GAME_PATH_PREFIX}/:slug`, gameDetailHandler); // /games/<slug>
 
 // SSR trang tùy biến do admin tạo: /<slug> (đặt CUỐI, sau mọi route khác).
 // Nginx proxy các path không phải file tĩnh/không phải /api về đây.
@@ -166,6 +190,14 @@ async function seedContent() {
       body:
         'Dino Dash là game khủng long chạy vượt chướng ngại vật, miễn phí ngay trên trình duyệt — không cần cài đặt.\n\n' +
         'Đăng nhập để lưu điểm, leo lên bảng xếp hạng và nhận quà hàng tháng. Chúc bạn chơi vui!',
+    },
+    games: {
+      title: 'Tổng hợp trò chơi',
+      metaTitle: '',
+      metaDescription:
+        'Tổng hợp các trò chơi miễn phí, chơi ngay trên trình duyệt — không cần cài đặt.',
+      intro:
+        '<p>Tất cả trò chơi của chúng tôi ở cùng một nơi. Bấm vào một trò chơi bất kỳ để chơi ngay.</p>',
     },
   };
 
