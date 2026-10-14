@@ -49,11 +49,11 @@ export function renderCustomPage(page) {
     <nav class="site-nav">
       <a class="site-logo" href="/">🦖 Dino Dash</a>
       <ul class="nav-menu">
-        <li><a href="/">Chơi ngay</a></li>
-        <li><a href="/how-to-play.html">Cách chơi</a></li>
-        <li><a href="/leaderboard.html">Bảng xếp hạng</a></li>
-        <li><a href="/rewards.html">Phần thưởng</a></li>
-        <li><a href="/about.html">Giới thiệu</a></li>
+        <li data-nav="allGames"><a href="/all-games">Trò chơi</a></li>
+        <li data-nav="howToPlay"><a href="/how-to-play.html">Cách chơi</a></li>
+        <li data-nav="leaderboard"><a href="/leaderboard.html">Bảng xếp hạng</a></li>
+        <li data-nav="rewards"><a href="/rewards.html">Phần thưởng</a></li>
+        <li data-nav="about"><a href="/about.html">Giới thiệu</a></li>
         <li><a href="/profile.html">Hồ sơ</a></li>
       </ul>
     </nav>
@@ -76,6 +76,17 @@ const publicPage = p => ({
   metaDescription: p.metaDescription,
   body: p.body,
   noindex: p.noindex,
+  showInMenu: p.showInMenu,
+});
+
+// --- Công khai: danh sách trang hiển thị trên menu header ---
+// (đặt TRƯỚC '/pages' admin; chỉ trả slug + tiêu đề cho nav.)
+router.get('/pages/menu', async (req, res) => {
+  const pages = await Page.find({ showInMenu: true })
+    .sort({ createdAt: 1 })
+    .select('slug title')
+    .lean();
+  res.json({ pages: pages.map(p => ({ slug: p.slug, title: p.title })) });
 });
 
 // --- Admin CRUD (/api/pages) ---
@@ -106,6 +117,7 @@ router.post('/pages', requireAdmin, async (req, res) => {
       metaDescription: String(req.body.metaDescription || ''),
       body: cleanHtml(req.body.body),
       noindex: !!req.body.noindex,
+      showInMenu: !!req.body.showInMenu,
     });
     res.status(201).json({ page: publicPage(page) });
   } catch (err) {
@@ -121,6 +133,7 @@ router.put('/pages/:id', requireAdmin, async (req, res) => {
       metaDescription: String(req.body.metaDescription || ''),
       body: cleanHtml(req.body.body),
       noindex: !!req.body.noindex,
+      showInMenu: !!req.body.showInMenu,
     };
     const page = await Page.findByIdAndUpdate(req.params.id, update, {
       new: true,

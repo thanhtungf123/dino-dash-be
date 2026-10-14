@@ -51,12 +51,11 @@ function navHtml() {
   return `<nav class="site-nav">
       <a class="site-logo" href="/">🦖 Dino Dash</a>
       <ul class="nav-menu">
-        <li><a href="/">Chơi ngay</a></li>
-        <li><a href="${LISTING_PATH}">Trò chơi</a></li>
-        <li><a href="/how-to-play.html">Cách chơi</a></li>
-        <li><a href="/leaderboard.html">Bảng xếp hạng</a></li>
-        <li><a href="/rewards.html">Phần thưởng</a></li>
-        <li><a href="/about.html">Giới thiệu</a></li>
+        <li data-nav="allGames"><a href="${LISTING_PATH}">Trò chơi</a></li>
+        <li data-nav="howToPlay"><a href="/how-to-play.html">Cách chơi</a></li>
+        <li data-nav="leaderboard"><a href="/leaderboard.html">Bảng xếp hạng</a></li>
+        <li data-nav="rewards"><a href="/rewards.html">Phần thưởng</a></li>
+        <li data-nav="about"><a href="/about.html">Giới thiệu</a></li>
         <li><a href="/profile.html">Hồ sơ</a></li>
       </ul>
     </nav>`;

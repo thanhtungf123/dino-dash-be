@@ -47,9 +47,13 @@ router.put('/settings', requireAdmin, async (req, res) => {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
   }
+  // Gộp (merge nông) với cấu hình hiện có để lưu từng phần không ghi đè phần khác
+  // (vd lưu "Menu header" không làm mất logo/footer, và ngược lại).
+  const existing = await Content.findOne({ key: 'site' }).lean();
+  const merged = { ...(existing?.data || {}), ...data };
   const doc = await Content.findOneAndUpdate(
     { key: 'site' },
-    { data },
+    { data: merged },
     { upsert: true, new: true }
   );
   return res.json({ data: doc.data });

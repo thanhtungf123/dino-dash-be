@@ -17,6 +17,8 @@ const pageSchema = new mongoose.Schema(
     metaDescription: { type: String, default: '' },
     body: { type: String, default: '' },
     noindex: { type: Boolean, default: false },
+    // Hiển thị trang này trên menu header (chèn trước mục "Hồ sơ").
+    showInMenu: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
