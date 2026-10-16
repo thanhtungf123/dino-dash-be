@@ -133,21 +133,14 @@ ${headHtml({
 </html>`;
 }
 
-// Khung game (responsive) + nút toàn màn hình + lớp phủ "xoay máy".
-// iframe KHÔNG render sẵn trong HTML — game-frame.js tự tạo (tự chạy trên
-// desktop/Android; iOS chờ người dùng chạm "Bấm để chơi" để nạp trong cử chỉ
-// người dùng, giúp game nặng chạy được trên Safari).
+// Khung iframe game (responsive) + nút toàn màn hình + lớp phủ "xoay máy".
 function gameFrame(g) {
   if (!g.embedUrl) return '';
   const lsClass = g.requireLandscape ? ' needs-landscape' : '';
-  const posterBg = g.thumbnailUrl
-    ? ` style="background-image:url('${esc(g.thumbnailUrl)}')"`
-    : '';
-  return `<div class="game-frame${lsClass}" id="gameFrame" data-embed="${esc(g.embedUrl)}" data-title="${esc(g.title)}">
-        <button type="button" class="game-play-poster"${posterBg} aria-label="Chơi ${esc(g.title)}">
-          <span class="game-play-icon">▶</span>
-          <span class="game-play-text">Bấm để chơi</span>
-        </button>
+  return `<div class="game-frame${lsClass}" id="gameFrame">
+        <iframe src="${esc(g.embedUrl)}" title="${esc(g.title)}"
+          allowfullscreen scrolling="no"
+          allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"></iframe>
         <div class="rotate-overlay" aria-hidden="true">
           <div class="rotate-overlay-inner">
             <span class="rotate-icon">📱</span>
@@ -157,7 +150,6 @@ function gameFrame(g) {
         <button type="button" class="game-fs-exit" aria-label="Thoát toàn màn hình">✕</button>
       </div>
       <div class="game-frame-actions">
-        <button type="button" class="game-reload-btn">↻ Tải lại game</button>
         <button type="button" class="game-fs-btn" data-fs-target="gameFrame">⛶ Toàn màn hình</button>
       </div>`;
 }
