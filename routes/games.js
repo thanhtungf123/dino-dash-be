@@ -133,13 +133,24 @@ ${headHtml({
 </html>`;
 }
 
-// Khung iframe game (responsive).
+// Khung iframe game (responsive) + nút toàn màn hình + lớp phủ "xoay máy".
 function gameFrame(g) {
   if (!g.embedUrl) return '';
-  return `<div class="game-frame">
+  const lsClass = g.requireLandscape ? ' needs-landscape' : '';
+  return `<div class="game-frame${lsClass}" id="gameFrame">
         <iframe src="${esc(g.embedUrl)}" title="${esc(g.title)}"
           loading="lazy" allowfullscreen
           allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"></iframe>
+        <div class="rotate-overlay" aria-hidden="true">
+          <div class="rotate-overlay-inner">
+            <span class="rotate-icon">📱</span>
+            <p>Xoay ngang điện thoại để chơi</p>
+          </div>
+        </div>
+        <button type="button" class="game-fs-exit" aria-label="Thoát toàn màn hình">✕</button>
+      </div>
+      <div class="game-frame-actions">
+        <button type="button" class="game-fs-btn" data-fs-target="gameFrame">⛶ Toàn màn hình</button>
       </div>`;
 }
 
@@ -172,6 +183,7 @@ ${headHtml({
       ${relatedHtml}
     </main>
     ${footerHtml()}
+    <script src="/app/game-frame.js" defer></script>
   </body>
 </html>`;
 }
@@ -225,6 +237,7 @@ const publicGame = g => ({
   embedUrl: g.embedUrl,
   shortDescription: g.shortDescription,
   body: g.body,
+  requireLandscape: g.requireLandscape,
   published: g.published,
   order: g.order,
   noindex: g.noindex,
@@ -249,6 +262,7 @@ function readGameBody(body) {
     embedUrl: normalizeEmbedUrl(body.embedUrl),
     shortDescription: String(body.shortDescription || '').trim(),
     body: cleanHtml(body.body),
+    requireLandscape: !!body.requireLandscape,
     published: body.published === undefined ? true : !!body.published,
     order: Number.isFinite(Number(body.order)) ? Number(body.order) : 0,
     noindex: !!body.noindex,

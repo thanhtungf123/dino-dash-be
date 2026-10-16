@@ -27,6 +27,8 @@ const gameSchema = new mongoose.Schema(
     shortDescription: { type: String, default: '' },
     // Nội dung chi tiết (HTML giàu định dạng) hiển thị dưới game.
     body: { type: String, default: '' },
+    // Game chỉ chơi tốt khi màn hình ngang -> hiện lớp phủ "xoay máy" khi để dọc trên mobile.
+    requireLandscape: { type: Boolean, default: false },
     published: { type: Boolean, default: true },
     // Thứ tự sắp xếp ở trang tổng hợp (số nhỏ hiện trước).
     order: { type: Number, default: 0 },
