@@ -80,7 +80,9 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '10kb' }));
+// 2mb: đủ cho nội dung văn bản dài. Ảnh KHÔNG nhúng base64 vào JSON nữa mà
+// upload riêng qua /settings/upload (Cloudinary) rồi chèn URL -> body luôn nhẹ.
+app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 // --- Rate limiting ---

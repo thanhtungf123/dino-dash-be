@@ -15,7 +15,7 @@ cloudinary.config({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // tối đa 2MB
+  limits: { fileSize: 8 * 1024 * 1024 }, // tối đa 8MB (đủ cho ảnh nội dung từ điện thoại)
 });
 
 const router = express.Router();
