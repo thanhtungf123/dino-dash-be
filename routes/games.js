@@ -139,8 +139,8 @@ function gameFrame(g) {
   const lsClass = g.requireLandscape ? ' needs-landscape' : '';
   return `<div class="game-frame${lsClass}" id="gameFrame">
         <iframe src="${esc(g.embedUrl)}" title="${esc(g.title)}"
-          loading="lazy" allowfullscreen
-          allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"></iframe>
+          allowfullscreen scrolling="no"
+          allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"></iframe>
         <div class="rotate-overlay" aria-hidden="true">
           <div class="rotate-overlay-inner">
             <span class="rotate-icon">📱</span>
